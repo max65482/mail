@@ -26,7 +26,7 @@ namespace OCA\Mail\Service\AutoConfig;
 use Psr\Log\LoggerInterface;
 
 class ConnectivityTester {
-	public const CONNECTION_TIMEOUT = 5;
+	public const CONNECTION_TIMEOUT = 20;
 
 	/** @var LoggerInterface */
 	protected $logger;

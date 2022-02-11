@@ -106,4 +106,31 @@ class AttachmentServiceTest extends TestCase {
 
 		$this->service->addFile($userId, $uploadedFile);
 	}
+
+	public function testSaveLocalMessageAttachemnt(): void {
+		$attachmentIds = [1,2,3];
+		$messageId = 100;
+
+		$this->mapper->expects(self::once())
+			->method('saveLocalMessageAttachments')
+			->with($messageId, $attachmentIds);
+		$this->mapper->expects(self::once())
+			->method('findByLocalMessageId')
+			->with($messageId)
+			->willReturn([$this->createMock(LocalAttachment::class)]);
+
+		$this->service->saveLocalMessageAttachments($messageId, $attachmentIds);
+	}
+
+	public function testSaveLocalMessageAttachemntNoAttachmentIds(): void {
+		$attachmentIds = [];
+		$messageId = 100;
+
+		$this->mapper->expects(self::never())
+			->method('saveLocalMessageAttachments');
+		$this->mapper->expects(self::never())
+			->method('findByLocalMessageId');
+
+		$this->service->saveLocalMessageAttachments($messageId, $attachmentIds);
+	}
 }
