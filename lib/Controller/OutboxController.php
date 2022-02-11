@@ -26,62 +26,52 @@ declare(strict_types=1);
 
 namespace OCA\Mail\Controller;
 
-use OCA\Mail\Http\JsonResponse;
+use OCA\Mail\Db\LocalMailboxMessage;
+use OCA\Mail\Exception\ClientException;
+use OCA\Mail\Exception\ServiceException;
+use OCA\Mail\Service\AccountService;
+use OCA\Mail\Service\OutboxService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
 class OutboxController extends Controller {
-	public function __construct(string $appName,
-								IRequest $request) {
-		parent::__construct($appName, $request);
-	}
 
-	private function stubbedMessage(int $id): array {
-		return [
-			'id' => $id,
-			'type' => 0,
-			'accountId' => 123,
-			'aliasId' => null,
-			'sendAt' => null,
-			'subject' => 'I am a stub',
-			'text' => 'bonjour',
-			'html' => false,
-			'inReplyToId' => null,
-			'draftId' => null,
-			'attachments' => [],
-			'to' => [
-				[
-					'id' => 1001,
-					'messageId' => $id,
-					'type' => 1,
-					'label' => 'Reci Pient One',
-					'email' => 'rep1@domain.tld',
-				],
-				[
-					'id' => 1002,
-					'messageId' => $id,
-					'type' => 1,
-					'label' => 'Recipient Two',
-					'email' => 'rep2@domain.tld',
-				],
-			],
-			'cc' => [],
-			'bcc' => [],
-		];
+	/** @var OutboxService */
+	private $service;
+
+	/** @var string */
+	private $userId;
+
+	/** @var AccountService */
+	private $accountService;
+
+	public function __construct(string $appName,
+								$UserId,
+								IRequest $request,
+								OutboxService $service,
+	AccountService $accountService) {
+		parent::__construct($appName, $request);
+		$this->userId = $UserId;
+		$this->service = $service;
+		$this->accountService = $accountService;
 	}
 
 	/**
 	 * @NoAdminRequired
 	 * @TrapError
+	 *
+	 * @return JSONResponse
 	 */
 	public function index(): JSONResponse {
-		return JsonResponse::success([
-			'messages' => [
-				$this->stubbedMessage(101),
-				$this->stubbedMessage(102),
-			],
-		]);
+		return new JSONResponse(
+			[
+				// TODO: wrap me in try/catch?!
+				'messages' => $this->service->getMessages($this->userId)
+			]
+		);
 	}
 
 	/**
@@ -89,13 +79,24 @@ class OutboxController extends Controller {
 	 * @TrapError
 	 *
 	 * @param int $id
+	 * @return JSONResponse
 	 */
 	public function show(int $id): JSONResponse {
-		if ($id === 101) {
-			return JsonResponse::success($this->stubbedMessage(101));
+//
+//		if ($id === 101) {
+//			return JsonResponse::success($this->stubbedMessage(101));
+//		}
+//
+//		return JsonResponse::fail(null, Http::STATUS_NOT_FOUND);
+
+		try {
+			$message = $this->service->getMessage($id, $this->userId);
+			$this->accountService->find($this->userId, $message->getAccountId());
+		} catch (ClientException $e) {
+			return new JSONResponse($e->getMessage(), $e->getCode());
 		}
 
-		return JsonResponse::fail(null, Http::STATUS_NOT_FOUND);
+		return new JSONResponse($message);
 	}
 
 	/**
@@ -127,35 +128,51 @@ class OutboxController extends Controller {
 		?int $inReplyToId = null,
 		?int $draftId = null
 	): JSONResponse {
-		if ($subject === 'error') {
-			return JsonResponse::error('the server errored');
+		try {
+			$this->accountService->find($this->userId, $accountId);
+		} catch (ClientException $e) {
+			return new JSONResponse([], Http::STATUS_FORBIDDEN);
 		}
 
-		if ($subject === 'invalid') {
-			return JsonResponse::fail('invalid message', Http::STATUS_UNPROCESSABLE_ENTITY);
-		}
+		$message = new LocalMailboxMessage();
+		$message->setType(LocalMailboxMessage::TYPE_OUTGOING);
+		$message->setAccountId($accountId);
+		$message->setAliasId($aliasId);
+		$message->setSendAt($sendAt);
+		$message->setSubject($subject);
+		$message->setBody($body);
+		$message->setHtml($isHtml);
+		$message->setInReplyToId($inReplyToId);
+		$message->setDraftId($draftId);
 
-		return JsonResponse::success($this->stubbedMessage(103), Http::STATUS_CREATED);
+		// TODO: wrap me in try/catch?!
+		$this->service->saveMessage($message, $to, $cc, $bcc, $attachmentIds);
+
+		// Return with related here?
+		return new JSONResponse(
+			$message, Http::STATUS_CREATED
+		);
 	}
 
 	/**
+	 * @todo Build this
 	 * @NoAdminRequired
 	 * @TrapError
 	 *
 	 * @param int $id
 	 */
 	public function update(int $id,
-							int $accountId,
-							string $subject,
-							string $body,
-							bool $isHtml,
-							array $to = [],
-							array $cc = [],
-							array $bcc = [],
-							array $attachmentIds = [],
-							?int $aliasId = null,
-							?int $inReplyToId = null,
-							?int $draftId = null): JSONResponse {
+						   int $accountId,
+						   string $subject,
+						   string $body,
+						   bool $isHtml,
+						   array $to = [],
+						   array $cc = [],
+						   array $bcc = [],
+						   array $attachmentIds = [],
+						   ?int $aliasId = null,
+						   ?int $inReplyToId = null,
+						   ?int $draftId = null): \OCA\Mail\Http\JsonResponse {
 		if ($id === 101) {
 			return JsonResponse::success($this->stubbedMessage($id));
 		}
@@ -168,13 +185,19 @@ class OutboxController extends Controller {
 	 * @TrapError
 	 *
 	 * @param int $id
+	 * @return JSONResponse
 	 */
-	public function send(int $id): JSONResponse {
-		if ($id === 102) {
-			return JsonResponse::error('could not send message');
+	public function send(int $id):JSONResponse {
+		try {
+			$message = $this->service->getMessage($id, $this->userId);
+			$account = $this->accountService->find($this->userId, $message->getAccountId());
+			$this->service->sendMessage($message, $account);
+		} catch (DoesNotExistException $e) {
+			return new JSONResponse($e->getMessage(), Http::STATUS_NOT_FOUND);
 		}
-
-		return JsonResponse::success($this->stubbedMessage($id));
+		return new JSONResponse(
+			'Message sent', Http::STATUS_ACCEPTED
+		);
 	}
 
 	/**
@@ -182,12 +205,16 @@ class OutboxController extends Controller {
 	 * @TrapError
 	 *
 	 * @param int $id
+	 * @return JSONResponse
 	 */
 	public function destroy(int $id): JSONResponse {
-		if ($id === 101) {
-			return JsonResponse::success($this->stubbedMessage($id));
+		try {
+			$message = $this->service->getMessage($id, $this->userId);
+			$this->accountService->find($this->userId, $message->getAccountId());
+			$this->service->deleteMessage($message, $this->userId);
+		} catch (ServiceException | ClientException $e) {
+			return new JSONResponse($e->getMessage());
 		}
-
-		return JsonResponse::fail('message not found', Http::STATUS_NOT_FOUND);
+		return new JSONResponse('Message deleted', Http::STATUS_ACCEPTED);
 	}
 }

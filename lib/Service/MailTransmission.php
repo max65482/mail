@@ -46,9 +46,11 @@ use OCA\Mail\Contracts\IAttachmentService;
 use OCA\Mail\Contracts\IMailManager;
 use OCA\Mail\Contracts\IMailTransmission;
 use OCA\Mail\Db\Alias;
+use OCA\Mail\Db\LocalMailboxMessage;
 use OCA\Mail\Db\Mailbox;
 use OCA\Mail\Db\MailboxMapper;
 use OCA\Mail\Db\Message;
+use OCA\Mail\Db\Recipient;
 use OCA\Mail\Events\DraftSavedEvent;
 use OCA\Mail\Events\MessageSentEvent;
 use OCA\Mail\Events\SaveDraftEvent;
@@ -205,6 +207,33 @@ class MailTransmission implements IMailTransmission {
 			MessageSentEvent::class,
 			new MessageSentEvent($account, $messageData, $replyData, $draft, $message, $mail)
 		);
+	}
+
+	public function sendLocalMessage(Account $account, LocalMailboxMessage $message, array $recipients, array $attachments = []): void {
+		$to = array_filter($recipients, static function ($recipient) {
+			if (Recipient::TYPE_TO === $recipient['type']) {
+				return Address::fromRaw($recipient['label'], $recipient['email']);
+			}
+		});
+		$toList = new AddressList($to);
+		$cc = new AddressList(array_filter($recipients, static function ($recipient) {
+			if (Recipient::TYPE_CC === $recipient['type']) {
+				return Address::fromRaw($recipient['label'], $recipient['email']);
+			}
+		}));
+		$bcc = new AddressList(
+			array_filter($recipients, static function ($recipient) {
+				if (Recipient::TYPE_BCC === $recipient['type']) {
+					return Address::fromRaw($recipient['label'], $recipient['email']);
+				}
+			}));
+		$messageData = new NewMessageData($account, $toList, $cc, $bcc, $message->getSubject(), $message->getBody(), $attachments, $message->isHtml());
+
+		try {
+			$this->sendMessage($messageData);
+		} catch (SentMailboxNotSetException $e) {
+			throw new ServiceException('Could not send message' . $e->getMessage(), $e->getCode(), $e);
+		}
 	}
 
 	/**
