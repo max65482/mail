@@ -28,12 +28,14 @@ namespace OCA\Mail\Tests\Unit\Service;
 
 use ChristophWurst\Nextcloud\Testing\TestCase;
 use OCA\Mail\Account;
-use OCA\Mail\Contracts\IMailTransmission;
+use OCA\Mail\Db\LocalAttachment;
 use OCA\Mail\Db\LocalAttachmentMapper;
-use OCA\Mail\Db\LocalMailboxMessage;
-use OCA\Mail\Db\LocalMailboxMessageMapper;
+use OCA\Mail\Db\LocalMessage;
+use OCA\Mail\Db\LocalMessageMapper;
+use OCA\Mail\Db\Recipient;
 use OCA\Mail\Db\RecipientMapper;
 use OCA\Mail\Exception\ServiceException;
+use OCA\Mail\Service\MailTransmission;
 use OCA\Mail\Service\OutboxService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -43,13 +45,13 @@ use Psr\Log\LoggerInterface;
 class OutboxServiceTest extends TestCase {
 
 
-	/** @var IMailTransmission|\PHPUnit\Framework\MockObject\MockObject */
+	/** @var MailTransmission|\PHPUnit\Framework\MockObject\MockObject */
 	private $transmission;
 
 	/** @var \PHPUnit\Framework\MockObject\MockObject|LoggerInterface */
 	private $logger;
 
-	/** @var LocalMailboxMessageMapper|\PHPUnit\Framework\MockObject\MockObject */
+	/** @var LocalMessageMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $mapper;
 
 	/** @var OutboxService */
@@ -64,9 +66,9 @@ class OutboxServiceTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$this->transmission = $this->createMock(IMailTransmission::class);
+		$this->transmission = $this->createMock(MailTransmission::class);
 		$this->logger = $this->createMock(LoggerInterface::class);
-		$this->mapper = $this->createMock(LocalMailboxMessageMapper::class);
+		$this->mapper = $this->createMock(LocalMessageMapper::class);
 		$this->attachmentMapper = $this->createMock(LocalAttachmentMapper::class);
 		$this->recipientsMapper = $this->createMock(RecipientMapper::class);
 		$this->outboxService = new OutboxService(
@@ -81,7 +83,7 @@ class OutboxServiceTest extends TestCase {
 	}
 
 	public function testGetMessages(): void {
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('getAllForUser')
 			->with($this->userId)
 			->willReturn([
@@ -116,7 +118,7 @@ class OutboxServiceTest extends TestCase {
 	}
 
 	public function testGetMessagesNoneFound(): void {
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('getAllForUser')
 			->with($this->userId)
 			->willThrowException(new Exception());
@@ -126,74 +128,74 @@ class OutboxServiceTest extends TestCase {
 	}
 
 	public function testGetMessage(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setInReplyToId(578);
+		$message->setInReplyToMessageId('abcd');
 
-		$this->mapper->expects($this->once())
-			->method('find')
-			->with(1)
+		$this->mapper->expects(self::once())
+			->method('findById')
+			->with(1, $this->userId)
 			->willReturn($message);
 
-		$this->outboxService->getMessage(1);
+		$this->outboxService->getMessage(1, $this->userId);
 	}
 
 	public function testNoMessage(): void {
-		$this->mapper->expects($this->once())
-			->method('find')
-			->with(1)
+		$this->mapper->expects(self::once())
+			->method('findById')
+			->with(1, $this->userId)
 			->willThrowException(new DoesNotExistException('Could not fetch any messages'));
 
-		$this->expectException(ServiceException::class);
-		$this->outboxService->getMessage(1);
+		$this->expectException(DoesNotExistException::class);
+		$this->outboxService->getMessage(1, $this->userId);
 	}
 
 	public function testDeleteMessage(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setInReplyToId(578);
+		$message->setInReplyToMessageId('abcd');
 
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('deleteWithRelated')
-			->with($message, $this->userId);
+			->with($message);
 
-		$this->outboxService->deleteMessage($message, $this->userId);
+		$this->outboxService->deleteMessage($message);
 	}
 
 	public function testDeleteMessageWithException(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setInReplyToId(57);
+		$message->setInReplyToMessageId('abcd');
 
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('deleteWithRelated')
-			->with($message, $this->userId)
+			->with($message)
 			->willThrowException(new Exception());
 
 		$this->expectException(ServiceException::class);
-		$this->outboxService->deleteMessage($message, $this->userId);
+		$this->outboxService->deleteMessage($message);
 	}
 
 	public function testSaveMessage(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setInReplyToId(578);
+		$message->setInReplyToMessageId('abcd');
 		$to = [
 			[
 				'label' => 'Lewis',
@@ -202,48 +204,66 @@ class OutboxServiceTest extends TestCase {
 		];
 		$cc = [];
 		$bcc = [];
+		$toRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $to);
+		$ccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $cc);
+		$bccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $bcc);
 		$attachmentIds = [
 			1, 2, 3
 		];
 
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('saveWithRelatedData')
-			->with($message, $to, $cc, $bcc, $attachmentIds);
+			->with($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
 
 		$this->outboxService->saveMessage($message, $to, $cc, $bcc, $attachmentIds);
 	}
 
 	public function testSaveMessageNoAttachments(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setInReplyToId(465);
+		$message->setInReplyToMessageId('abcd');
 		$to = [
 			[
 				'label' => 'Pam',
 				'email' => 'BuyMeAnAle@startdewvalley.com'
 			]
 		];
+		$message->setRecipients($to);
 		$cc = [];
 		$bcc = [];
-		$this->mapper->expects($this->once())
+		$toRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $to);
+		$ccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $cc);
+		$bccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $bcc);
+		$this->mapper->expects(self::once())
 			->method('saveWithRelatedData')
-			->with($message, $to, $cc, $bcc);
+			->with($message, $toRecipients, $ccRecipients, $bccRecipients);
 
 		$this->outboxService->saveMessage($message, $to, $cc, $bcc);
 	}
 
 	public function testSaveMessageError(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setSendAt($this->time->getTime());
 		$message->setSubject('Test');
 		$message->setBody('Test Test Test');
 		$message->setHtml(true);
-		$message->setMdn(false);
 		$message->setInReplyToMessageId('laskdjhsakjh33233928@startdewvalley.com');
 		$to = [
 			[
@@ -251,10 +271,12 @@ class OutboxServiceTest extends TestCase {
 				'email' => 'museum@startdewvalley.com'
 			]
 		];
-
-		$this->mapper->expects($this->once())
+		$toRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $to);
+		$this->mapper->expects(self::once())
 			->method('saveWithRelatedData')
-			->with($message, $to)
+			->with($message, $toRecipients, [], [])
 			->willThrowException(new Exception());
 
 		$this->expectException(ServiceException::class);
@@ -262,35 +284,30 @@ class OutboxServiceTest extends TestCase {
 	}
 
 	public function testSendMessage(): void {
-		$message = new LocalMailboxMessage();
+		$message = new LocalMessage();
 		$message->setId(1);
-		$recipients = [
-			[
-				'label' => 'Gunther',
-				'email' => 'museum@startdewvalley.com'
-			]
-		];
-		$attachments = [
-			[
-				'fileName' => 'SlimesInTheMines.png',
-				'mimeType' => 'image/png',
-				'createdAt' => $this->time->getTime()
-			]
-		];
+		$recipient = new Recipient();
+		$recipient->setEmail('museum@startdewvalley.com');
+		$recipient->setLabel('Gunther');
+		$recipient->setType(Recipient::TYPE_TO);
+		$recipients = [$recipient];
+		$attachment = new LocalAttachment();
+		$attachment->setMimeType('image/png');
+		$attachment->setFileName('SlimesInTheMines.png');
+		$attachment->setCreatedAt($this->time->getTime());
+		$attachments = [$attachment];
+		$message->setRecipients($recipients);
+		$message->setAttachments($attachments);
 		$account = $this->createConfiguredMock(Account::class, [
 			'getUserId' => $this->userId
 		]);
 
-		$this->mapper->expects($this->once())
-			->method('getRelatedData')
-			->with($message->getId(), $account->getUserId())
-			->willReturn(['recipients' => $recipients, 'attachments' => $attachments]);
-		$this->transmission->expects($this->once())
+		$this->transmission->expects(self::once())
 			->method('sendLocalMessage')
 			->with($account, $message, $recipients, $attachments);
-		$this->mapper->expects($this->once())
+		$this->mapper->expects(self::once())
 			->method('deleteWithRelated')
-			->with($message, $this->userId);
+			->with($message);
 
 		$this->outboxService->sendMessage($message, $account);
 	}

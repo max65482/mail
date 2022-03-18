@@ -30,8 +30,8 @@ use OCA\Mail\Account;
 use OCA\Mail\Contracts\ILocalMailboxService;
 use OCA\Mail\Contracts\IMailTransmission;
 use OCA\Mail\Db\LocalAttachmentMapper;
-use OCA\Mail\Db\LocalMailboxMessage;
-use OCA\Mail\Db\LocalMailboxMessageMapper;
+use OCA\Mail\Db\LocalMessage;
+use OCA\Mail\Db\LocalMessageMapper;
 use OCA\Mail\Db\Recipient;
 use OCA\Mail\Db\RecipientMapper;
 use OCA\Mail\Exception\ServiceException;
@@ -47,7 +47,7 @@ class OutboxService implements ILocalMailboxService {
 	/** @var LoggerInterface */
 	private $logger;
 
-	/** @var LocalMailboxMessageMapper */
+	/** @var LocalMessageMapper */
 	private $mapper;
 
 	/** @var LocalAttachmentMapper */
@@ -58,7 +58,7 @@ class OutboxService implements ILocalMailboxService {
 
 	public function __construct(IMailTransmission $transmission,
 								LoggerInterface $logger,
-								LocalMailboxMessageMapper $mapper,
+								LocalMessageMapper $mapper,
 								LocalAttachmentMapper $attachmentMapper,
 								RecipientMapper $recipientMapper) {
 		$this->transmission = $transmission;
@@ -69,19 +69,12 @@ class OutboxService implements ILocalMailboxService {
 	}
 
 	/**
+	 * @return LocalMessage[]
 	 * @throws ServiceException
 	 */
 	public function getMessages(string $userId): array {
 		try {
-			$messages = $this->mapper->getAllForUser($userId);
-
-			// Attach related data
-			return array_map(function (LocalMailboxMessage $message) use ($userId) {
-				$row = $message->jsonSerialize();
-				$row['attachments'] = $this->attachmentMapper->findByLocalMailboxMessageId($message->getId(), $userId);
-				$row['recipients'] = $this->recipientMapper->findByMessageId($message->getId(), Recipient::MAILBOX_TYPE_OUTBOX);
-				return $row;
-			}, $messages);
+			return $this->mapper->getAllForUser($userId);
 		} catch (Exception $e) {
 			throw new ServiceException("Could not get messages for user $userId", 0, $e);
 		}
@@ -89,20 +82,19 @@ class OutboxService implements ILocalMailboxService {
 
 	/**
 	 * @param int $id
-	 * @return LocalMailboxMessage
+	 * @return LocalMessage
 	 * @throws DoesNotExistException
 	 */
-	public function getMessage(int $id, string $userId): LocalMailboxMessage {
+	public function getMessage(int $id, string $userId): LocalMessage {
 		return $this->mapper->findById($id, $userId);
 	}
 
 	/**
 	 * @throws ServiceException
 	 */
-	public function deleteMessage(LocalMailboxMessage $message, string $userId): void {
-		// also delete all related entries in the recipients and attachments table
+	public function deleteMessage(LocalMessage $message): void {
 		try {
-			$this->mapper->deleteWithRelated($message, $userId);
+			$this->mapper->deleteWithRelated($message);
 		} catch (Exception $e) {
 			throw new ServiceException('Could not delete message' . $e->getMessage(), $e->getCode(), $e);
 		}
@@ -111,11 +103,10 @@ class OutboxService implements ILocalMailboxService {
 	/**
 	 * @throws ServiceException
 	 */
-	public function sendMessage(LocalMailboxMessage $message, Account $account): void {
+	public function sendMessage(LocalMessage $message, Account $account): void {
 		try {
-			$related = $this->mapper->getRelatedData($message->getId(), $account->getUserId());
-			$this->transmission->sendLocalMessage($account, $message, $related['recipients'], $related['attachments']);
-			$this->mapper->deleteWithRelated($message, $account->getUserId());
+			$this->transmission->sendLocalMessage($account, $message, $message->getRecipients(), $message->getAttachments());
+			$this->mapper->deleteWithRelated($message);
 		} catch (Exception $e) {
 			throw new ServiceException('Could not send message', 0, $e);
 		}
@@ -124,9 +115,19 @@ class OutboxService implements ILocalMailboxService {
 	/**
 	 * @throws ServiceException
 	 */
-	public function saveMessage(LocalMailboxMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMailboxMessage {
+	public function saveMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+		$toRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $to);
+		$ccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $cc);
+		$bccRecipients = array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $bcc);
+
 		try {
-			$this->mapper->saveWithRelatedData($message, $to, $cc, $bcc, $attachmentIds);
+			$this->mapper->saveWithRelatedData($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
 		} catch (Exception $e) {
 			throw new ServiceException('Could not save message', 400, $e);
 		}

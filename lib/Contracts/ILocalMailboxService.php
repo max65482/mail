@@ -27,7 +27,7 @@ declare(strict_types=1);
 namespace OCA\Mail\Contracts;
 
 use OCA\Mail\Account;
-use OCA\Mail\Db\LocalMailboxMessage;
+use OCA\Mail\Db\LocalMessage;
 use OCA\Mail\Exception\ClientException;
 use OCA\Mail\Exception\ServiceException;
 
@@ -42,36 +42,36 @@ interface ILocalMailboxService {
 	/**
 	 * @param int $id
 	 *
-	 * @return LocalMailboxMessage
+	 * @return LocalMessage
 	 *
 	 * @throws ServiceException
 	 */
-	public function getMessage(int $id, string $userId): LocalMailboxMessage;
+	public function getMessage(int $id, string $userId): LocalMessage;
 
 	/**
-	 * @param LocalMailboxMessage $message
+	 * @param LocalMessage $message
 	 * @param array $to
 	 * @param array $cc
 	 * @param array $bcc
 	 * @param array $attachmentIds
-	 * @return LocalMailboxMessage
+	 * @return LocalMessage
 	 */
-	public function saveMessage(LocalMailboxMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMailboxMessage;
+	public function saveMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage;
 
 	/**
-	 * @param LocalMailboxMessage $message
+	 * @param LocalMessage $message
 	 * @param string $userId
 	 * @throws ClientException
 	 * @throws ServiceException
 	 */
-	public function deleteMessage(LocalMailboxMessage $message, string $userId): void;
+	public function deleteMessage(LocalMessage $message): void;
 
 	/**
-	 * @param LocalMailboxMessage $message
+	 * @param LocalMessage $message
 	 * @param Account $account
 	 * @return void
 	 * @throws ClientException
 	 * @throws ServiceException
 	 */
-	public function sendMessage(LocalMailboxMessage $message, Account $account): void;
+	public function sendMessage(LocalMessage $message, Account $account): void;
 }

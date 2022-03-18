@@ -117,13 +117,14 @@ class LocalMessageMapper extends QBMapper {
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
 	 */
-	public function saveWithRelatedData(LocalMessage $message, array $to, array $cc, array $bcc): void {
+	public function saveWithRelatedData(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): void {
 		$this->db->beginTransaction();
 		try {
 			$message = $this->insert($message);
 			$this->recipientMapper->saveRecipients($message->getId(), $to, Recipient::TYPE_TO);
 			$this->recipientMapper->saveRecipients($message->getId(), $cc, Recipient::TYPE_CC);
 			$this->recipientMapper->saveRecipients($message->getId(), $bcc, Recipient::TYPE_BCC);
+			$this->attachmentMapper->saveAttachments($message->getId(), $attachmentIds);
 			$this->db->commit();
 		} catch (Throwable $e) {
 			$this->db->rollBack();
