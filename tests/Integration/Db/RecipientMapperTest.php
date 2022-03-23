@@ -131,7 +131,7 @@ class RecipientMapperTest extends TestCase {
 	 * @depends testFindAllRecipientsEmpty
 	 */
 	public function testDeleteForLocalMailbox(): void {
-		$this->mapper->deleteForLocalMailbox($this->message->getId());
+		$this->mapper->deleteForLocalMessage($this->message->getId());
 		$result = $this->mapper->findByLocalMessageId($this->message->getId());
 		$this->assertEmpty($result);
 	}

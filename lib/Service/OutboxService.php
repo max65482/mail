@@ -32,7 +32,6 @@ use OCA\Mail\Contracts\IMailTransmission;
 use OCA\Mail\Db\LocalAttachmentMapper;
 use OCA\Mail\Db\LocalMessage;
 use OCA\Mail\Db\LocalMessageMapper;
-use OCA\Mail\Db\Recipient;
 use OCA\Mail\Db\RecipientMapper;
 use OCA\Mail\Exception\ServiceException;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -116,18 +115,23 @@ class OutboxService implements ILocalMailboxService {
 	 * @throws ServiceException
 	 */
 	public function saveMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
-		$toRecipients = array_map(function ($recipient) {
-			return Recipient::fromRow($recipient);
-		}, $to);
-		$ccRecipients = array_map(function ($recipient) {
-			return Recipient::fromRow($recipient);
-		}, $cc);
-		$bccRecipients = array_map(function ($recipient) {
-			return Recipient::fromRow($recipient);
-		}, $bcc);
-
+		$toRecipients = $this->recipientMapper->convertToRecipient($to);
+		$ccRecipients = $this->recipientMapper->convertToRecipient($cc);
+		$bccRecipients = $this->recipientMapper->convertToRecipient($bcc);
 		try {
 			$this->mapper->saveWithRelatedData($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
+		} catch (Exception $e) {
+			throw new ServiceException('Could not save message', 400, $e);
+		}
+		return $message;
+	}
+
+	public function updateMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+		$toRecipients = $this->recipientMapper->convertToRecipient($to);
+		$ccRecipients = $this->recipientMapper->convertToRecipient($cc);
+		$bccRecipients = $this->recipientMapper->convertToRecipient($bcc);
+		try {
+			$message = $this->mapper->updateWithRelatedData($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
 		} catch (Exception $e) {
 			throw new ServiceException('Could not save message', 400, $e);
 		}

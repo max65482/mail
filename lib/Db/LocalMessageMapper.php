@@ -75,6 +75,10 @@ class LocalMessageMapper extends QBMapper {
 		}
 		$rows->closeCursor();
 
+		if (empty($ids)) {
+			return [];
+		}
+
 		$attachments = $this->attachmentMapper->findByLocalMessageIds($ids);
 		$recipients = $this->recipientMapper->findByLocalMessageIds($ids);
 
@@ -132,11 +136,37 @@ class LocalMessageMapper extends QBMapper {
 		}
 	}
 
+	/**
+	 * @param Recipient[] $to
+	 * @param Recipient[] $cc
+	 * @param Recipient[] $bcc
+	 */
+	public function updateWithRelatedData(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+		$this->db->beginTransaction();
+		try {
+			$message = $this->update($message);
+			// is this correct? I don't think this is the way to go?
+			// option 2 would be a diff
+			// option 3 would be YOLO - just write it (don't do this)
+			$this->recipientMapper->deleteForLocalMessage($message->getId());
+			$this->attachmentMapper->deleteForLocalMailbox($message->getId());
+			$this->recipientMapper->saveRecipients($message->getId(), $to, Recipient::TYPE_TO);
+			$this->recipientMapper->saveRecipients($message->getId(), $cc, Recipient::TYPE_CC);
+			$this->recipientMapper->saveRecipients($message->getId(), $bcc, Recipient::TYPE_BCC);
+			$this->attachmentMapper->saveAttachments($message->getId(), $attachmentIds);
+			$this->db->commit();
+		} catch (Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+		return $message;
+	}
+
 	public function deleteWithRelated(LocalMessage $message): void {
 		$this->db->beginTransaction();
 		try {
 			$this->attachmentMapper->deleteForLocalMailbox($message->getId());
-			$this->recipientMapper->deleteForLocalMailbox($message->getId());
+			$this->recipientMapper->deleteForLocalMessage($message->getId());
 			$this->delete($message);
 			$this->db->commit();
 		} catch (Throwable $e) {

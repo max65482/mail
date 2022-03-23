@@ -68,7 +68,7 @@ class RecipientMapper extends QBMapper {
 		return $this->findEntities($query);
 	}
 
-	public function deleteForLocalMailbox(int $localMessageId): void {
+	public function deleteForLocalMessage(int $localMessageId): void {
 		$qb = $this->db->getQueryBuilder();
 
 		$qb->delete($this->getTableName())
@@ -103,5 +103,14 @@ class RecipientMapper extends QBMapper {
 			$qb->setParameter('email', $recipient->getEmail(), IQueryBuilder::PARAM_STR);
 			$qb->execute();
 		}
+	}
+
+	/**
+	 * @return Recipient[]
+	 */
+	public function convertToRecipient(array $recipients): array {
+		return array_map(function ($recipient) {
+			return Recipient::fromRow($recipient);
+		}, $recipients);
 	}
 }
