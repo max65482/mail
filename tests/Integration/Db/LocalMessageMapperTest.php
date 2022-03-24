@@ -128,7 +128,7 @@ class LocalMessageMapperTest extends TestCase {
 	/**
 	 * @depends testFindById
 	 */
-	public function testDeleteWithRelated(): void {
+	public function testDeleteWithRecipients(): void {
 		$this->mapper->deleteWithRecipients($this->entity);
 
 		$result = $this->mapper->getAllForUser($this->getTestAccountUserId());
@@ -170,5 +170,53 @@ class LocalMessageMapperTest extends TestCase {
 		$this->assertTrue($row->isHtml());
 		$this->assertEmpty($row->getAttachments());
 		$this->assertCount(1, $row->getRecipients());
+	}
+
+	public function testUpdateWithRecipient(): void {
+		$results = $this->mapper->getAllForUser($this->account->getUserId());
+		$this->assertEmpty($results[0]->getRecipients());
+		// cleanup
+		$recipient = new Recipient();
+		$recipient->setEmail('wizard@stardew-valley.com');
+		$recipient->setLabel('M. Rasmodeus');
+		$recipient->setType(Recipient::TYPE_TO);
+		$recipient2 = new Recipient();
+		$recipient2->setEmail('penny@stardew-valley.com');
+		$recipient2->setLabel('Penny');
+		$recipient2->setType(Recipient::TYPE_TO);
+		$to = [$recipient, $recipient2];
+
+		$this->mapper->updateWithRecipients($results[0], $to, [], []);
+
+		$results = $this->mapper->getAllForUser($this->account->getUserId());
+		$this->assertCount(2, $results[0]->getRecipients());
+	}
+
+	public function testUpdateWithRecipientOnlyOne(): void {
+		$message = new LocalMessage();
+		$message->setType(LocalMessage::TYPE_OUTGOING);
+		$message->setAccountId($this->account->getId());
+		$message->setAliasId(3);
+		$message->setSendAt(3);
+		$message->setSubject('savedWithRelated');
+		$message->setBody('message');
+		$message->setHtml(true);
+		$message->setInReplyToMessageId('abcdefg');
+		$recipient = new Recipient();
+		$recipient->setEmail('wizard@stardew-valley.com');
+		$recipient->setLabel('M. Rasmodeus');
+		$recipient->setType(Recipient::TYPE_TO);
+		$result = $this->mapper->saveWithRecipients($message, [$recipient], [], []);
+		$rr = $result->getRecipients();
+		$this->assertEquals($recipient->getEmail(), $rr[0]->getEmail());
+
+		$recipient2 = new Recipient();
+		$recipient2->setEmail('penny@stardew-valley.com');
+		$recipient2->setLabel('Penny');
+		$recipient2->setType(Recipient::TYPE_TO);
+		$result = $this->mapper->updateWithRecipients($result, [$recipient2], [], []);
+		$rr = $result->getRecipients();
+		$this->assertEquals($recipient2->getEmail(), $rr[0]->getEmail());
+		$this->assertCount(1, $result->getRecipients());
 	}
 }

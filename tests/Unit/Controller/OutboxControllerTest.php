@@ -37,7 +37,7 @@ use OCA\Mail\Http\JsonResponse;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\OutboxService;
 use OCP\AppFramework\Db\DoesNotExistException;
-use OCP\AppFramework\Http as HttpAlias;
+use OCP\DB\Exception;
 use OCP\IRequest;
 
 class OutboxControllerTest extends TestCase {
@@ -89,16 +89,6 @@ class OutboxControllerTest extends TestCase {
 		$this->assertEquals($expected, $actual);
 	}
 
-	public function testIndexExeption(): void {
-		$this->service->expects(self::once())
-			->method('getMessages')
-			->with($this->userId)
-			->willThrowException(new ServiceException());
-
-		$this->expectException(ServiceException::class);
-		$this->controller->index();
-	}
-
 	public function testShow(): void {
 		$message = new LocalMessage();
 		$message->setId(1);
@@ -128,10 +118,8 @@ class OutboxControllerTest extends TestCase {
 		$this->accountService->expects(self::never())
 			->method('find');
 
-		$expected = JsonResponse::fail(null, HttpAlias::STATUS_NOT_FOUND);
-		$actual = $this->controller->show($message->getId());
-
-		$this->assertEquals($expected, $actual);
+		$this->expectException(DoesNotExistException::class);
+		$this->controller->show($message->getId());
 	}
 
 	public function testShowAccountNotFound(): void {
@@ -147,10 +135,8 @@ class OutboxControllerTest extends TestCase {
 			->method('find')
 			->willThrowException(new ClientException('', 400));
 
-		$expected = JsonResponse::fail('', Http::STATUS_BAD_REQUEST);
-		$actual = $this->controller->show($message->getId());
-
-		$this->assertEquals($expected, $actual);
+		$this->expectException(ClientException::class);
+		$this->controller->show($message->getId());
 	}
 
 	public function testSend(): void {
@@ -191,6 +177,7 @@ class OutboxControllerTest extends TestCase {
 		$this->service->expects(self::never())
 			->method('sendMessage');
 
+		$this->expectException(DoesNotExistException::class);
 		$expected = JsonResponse::fail('', Http::STATUS_NOT_FOUND);
 		$actual = $this->controller->send($message->getId());
 
@@ -249,13 +236,9 @@ class OutboxControllerTest extends TestCase {
 			->method('getMessage')
 			->with($message->getId(), $this->userId)
 			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId())
-			->willReturn($account);
 		$this->service->expects(self::once())
 			->method('deleteMessage')
-			->with($message);
+			->with($this->userId, $message);
 
 		$expected = JsonResponse::success('Message deleted', Http::STATUS_ACCEPTED);
 		$actual = $this->controller->destroy($message->getId());
@@ -272,56 +255,11 @@ class OutboxControllerTest extends TestCase {
 			->method('getMessage')
 			->with($message->getId(), $this->userId)
 			->willThrowException(new DoesNotExistException(''));
-		$this->accountService->expects(self::never())
-			->method('find');
 		$this->service->expects(self::never())
 			->method('deleteMessage');
 
 		$this->expectException(DoesNotExistException::class);
-		$this->controller->destroy($message->getId());
-	}
-
-	public function testDestroyServiceException(): void {
-		$message = new LocalMessage();
-		$message->setId(1);
-		$message->setAccountId(1);
-		$account = new Account(new MailAccount());
-
-		$this->service->expects(self::once())
-			->method('getMessage')
-			->with($message->getId(), $this->userId)
-			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId())
-			->willReturn($account);
-		$this->service->expects(self::once())
-			->method('deleteMessage')
-			->willThrowException(new ServiceException());
-
-		$expected = JsonResponse::fail('');
-		$actual = $this->controller->destroy($message->getId());
-
-		$this->assertEquals($expected, $actual);
-	}
-
-	public function testDestroyClientException(): void {
-		$message = new LocalMessage();
-		$message->setId(1);
-		$message->setAccountId(1);
-
-		$this->service->expects(self::once())
-			->method('getMessage')
-			->with($message->getId(), $this->userId)
-			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId())
-			->willThrowException(new ClientException());
-		$this->service->expects(self::never())
-			->method('deleteMessage');
-
-		$expected = JsonResponse::fail('');
+		$expected = JsonResponse::fail('', Http::STATUS_NOT_FOUND);
 		$actual = $this->controller->destroy($message->getId());
 
 		$this->assertEquals($expected, $actual);
@@ -344,7 +282,7 @@ class OutboxControllerTest extends TestCase {
 			->with($this->userId, $message->getAccountId());
 		$this->service->expects(self::once())
 			->method('saveMessage')
-			->with($message, $to, $cc, [], []);
+			->with($this->userId, $message, $to, $cc, [], []);
 
 		$expected = JsonResponse::success($message, Http::STATUS_CREATED);
 		$actual = $this->controller->create(
@@ -382,7 +320,7 @@ class OutboxControllerTest extends TestCase {
 		$this->service->expects(self::never())
 			->method('saveMessage');
 
-		$expected = JsonResponse::fail(null, Http::STATUS_FORBIDDEN);
+		$this->expectException(ClientException::class);
 		$actual = $this->controller->create(
 			$message->getAccountId(),
 			$message->getSubject(),
@@ -395,11 +333,9 @@ class OutboxControllerTest extends TestCase {
 			$message->getAliasId(),
 			$message->getInReplyToMessageId()
 		);
-
-		$this->assertEquals($expected, $actual);
 	}
 
-	public function testCreateServiceException(): void {
+	public function testCreateDbException(): void {
 		$message = new LocalMessage();
 		$message->setAccountId(1);
 		$message->setAliasId(2);
@@ -416,9 +352,9 @@ class OutboxControllerTest extends TestCase {
 			->with($this->userId, $message->getAccountId());
 		$this->service->expects(self::once())
 			->method('saveMessage')
-			->willThrowException(new ServiceException(''));
+			->willThrowException(new Exception());
 
-		$this->expectException(ServiceException::class);
+		$this->expectException(Exception::class);
 		$this->controller->create(
 			$message->getAccountId(),
 			$message->getSubject(),
@@ -450,12 +386,9 @@ class OutboxControllerTest extends TestCase {
 			->method('getMessage')
 			->with($message->getId(), $this->userId)
 			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId());
 		$this->service->expects(self::once())
 			->method('updateMessage')
-			->with($message, $to, $cc, [], [])
+			->with($this->userId, $message, $to, $cc, [], [])
 			->willReturn($message);
 
 		$expected = JsonResponse::success($message, Http::STATUS_ACCEPTED);
@@ -493,11 +426,11 @@ class OutboxControllerTest extends TestCase {
 			->method('getMessage')
 			->with($message->getId(), $this->userId)
 			->willThrowException(new DoesNotExistException(''));
-		$this->accountService->expects(self::never())
-			->method('find');
 		$this->service->expects(self::never())
 			->method('updateMessage');
 
+
+		$this->expectException(DoesNotExistException::class);
 		$expected = JsonResponse::fail('', Http::STATUS_NOT_FOUND);
 		$actual = $this->controller->update(
 			$message->getId(),
@@ -516,7 +449,7 @@ class OutboxControllerTest extends TestCase {
 		$this->assertEquals($expected, $actual);
 	}
 
-	public function testUpdateClientException(): void {
+	public function testUpdateDbException(): void {
 		$message = new LocalMessage();
 		$message->setId(1);
 		$message->setAccountId(1);
@@ -533,55 +466,12 @@ class OutboxControllerTest extends TestCase {
 			->method('getMessage')
 			->with($message->getId(), $this->userId)
 			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId())
-			->willThrowException(new ClientException());
-		$this->service->expects(self::never())
-			->method('updateMessage');
-
-		$this->expectException(ClientException::class);
-		$this->controller->update(
-			$message->getId(),
-			$message->getAccountId(),
-			$message->getSubject(),
-			$message->getBody(),
-			$message->isHtml(),
-			$to,
-			$cc,
-			[],
-			[],
-			$message->getAliasId(),
-			$message->getInReplyToMessageId()
-		);
-	}
-
-	public function testUpdateServiceException(): void {
-		$message = new LocalMessage();
-		$message->setId(1);
-		$message->setAccountId(1);
-		$message->setAliasId(2);
-		$message->setSubject('subject');
-		$message->setBody('message');
-		$message->setHtml(true);
-		$message->setInReplyToMessageId('abc');
-		$message->setType(LocalMessage::TYPE_OUTGOING);
-		$to = [['label' => 'Lewis', 'email' => 'tent@stardewvalley.com']];
-		$cc = [['label' => 'Pierre', 'email' => 'generalstore@stardewvalley.com']];
-
-		$this->service->expects(self::once())
-			->method('getMessage')
-			->with($message->getId(), $this->userId)
-			->willReturn($message);
-		$this->accountService->expects(self::once())
-			->method('find')
-			->with($this->userId, $message->getAccountId());
 		$this->service->expects(self::once())
 			->method('updateMessage')
-			->with($message, $to, $cc, [], [])
-			->willThrowException(new ServiceException(''));
+			->with($this->userId, $message, $to, $cc, [], [])
+			->willThrowException(new Exception());
 
-		$this->expectException(ServiceException::class);
+		$this->expectException(Exception::class);
 		$this->controller->update(
 			$message->getId(),
 			$message->getAccountId(),
