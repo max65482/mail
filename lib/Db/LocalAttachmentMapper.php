@@ -82,7 +82,7 @@ class LocalAttachmentMapper extends QBMapper {
 		return $this->findEntity($query);
 	}
 
-	public function deleteForLocalMailbox(int $localMessageId): void {
+	public function deleteForLocalMessage(int $localMessageId): void {
 		$this->db->beginTransaction();
 		try {
 			$qb = $this->db->getQueryBuilder();
@@ -90,6 +90,22 @@ class LocalAttachmentMapper extends QBMapper {
 				->where($qb->expr()->eq('local_message_id', $qb->createNamedParameter($localMessageId), IQueryBuilder::PARAM_INT));
 			$qb->execute();
 			$this->db->commit();
+		} catch (Throwable $e) {
+			$this->db->rollBack();
+			throw $e;
+		}
+	}
+
+	public function saveLocalMessageAttachments(int $messageId, array $attachmentIds) {
+		$this->db->beginTransaction();
+		try {
+			$qb = $this->db->getQueryBuilder();
+			$qb->update($this->getTableName())
+				->set('local_message_id', $qb->createNamedParameter($messageId, IQueryBuilder::PARAM_INT))
+				->where(
+					$qb->expr()->in('id', $qb->createNamedParameter($attachmentIds, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY)
+				);
+			$qb->execute();
 		} catch (Throwable $e) {
 			$this->db->rollBack();
 			throw $e;

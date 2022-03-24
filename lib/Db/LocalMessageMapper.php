@@ -121,19 +121,21 @@ class LocalMessageMapper extends QBMapper {
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
 	 */
-	public function saveWithRelatedData(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): void {
+	public function saveWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
 		$this->db->beginTransaction();
 		try {
 			$message = $this->insert($message);
-			$this->recipientMapper->saveRecipients($message->getId(), $to, Recipient::TYPE_TO);
-			$this->recipientMapper->saveRecipients($message->getId(), $cc, Recipient::TYPE_CC);
-			$this->recipientMapper->saveRecipients($message->getId(), $bcc, Recipient::TYPE_BCC);
-			$this->attachmentMapper->saveAttachments($message->getId(), $attachmentIds);
+			$this->recipientMapper->saveRecipients($message->getId(), $to);
+			$this->recipientMapper->saveRecipients($message->getId(), $cc);
+			$this->recipientMapper->saveRecipients($message->getId(), $bcc);
+			//@todo
 			$this->db->commit();
 		} catch (Throwable $e) {
 			$this->db->rollBack();
 			throw $e;
 		}
+
+		return $message;
 	}
 
 	/**
@@ -141,19 +143,15 @@ class LocalMessageMapper extends QBMapper {
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
 	 */
-	public function updateWithRelatedData(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+	public function updateWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+		// make diff here:
+		// compoare ald vs new like tags
+		$attachments = $message->getAttachments();
+
 		$this->db->beginTransaction();
 		try {
 			$message = $this->update($message);
-			// is this correct? I don't think this is the way to go?
-			// option 2 would be a diff
-			// option 3 would be YOLO - just write it (don't do this)
-			$this->recipientMapper->deleteForLocalMessage($message->getId());
-			$this->attachmentMapper->deleteForLocalMailbox($message->getId());
-			$this->recipientMapper->saveRecipients($message->getId(), $to, Recipient::TYPE_TO);
-			$this->recipientMapper->saveRecipients($message->getId(), $cc, Recipient::TYPE_CC);
-			$this->recipientMapper->saveRecipients($message->getId(), $bcc, Recipient::TYPE_BCC);
-			$this->attachmentMapper->saveAttachments($message->getId(), $attachmentIds);
+			$this->recipientMapper->updateRecipients($message->getId(), $message->getRecipients(), $to, $cc, $bcc);
 			$this->db->commit();
 		} catch (Throwable $e) {
 			$this->db->rollBack();
@@ -162,10 +160,9 @@ class LocalMessageMapper extends QBMapper {
 		return $message;
 	}
 
-	public function deleteWithRelated(LocalMessage $message): void {
+	public function deleteWithRecipients(LocalMessage $message): void {
 		$this->db->beginTransaction();
 		try {
-			$this->attachmentMapper->deleteForLocalMailbox($message->getId());
 			$this->recipientMapper->deleteForLocalMessage($message->getId());
 			$this->delete($message);
 			$this->db->commit();

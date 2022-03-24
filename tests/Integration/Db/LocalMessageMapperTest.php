@@ -156,7 +156,7 @@ class LocalMessageMapperTest extends TestCase {
 		$recipient->setLabel('M. Rasmodeus');
 		$to = [$recipient];
 
-		$this->mapper->saveWithRelatedData($message, $to, [], []);
+		$this->mapper->saveWithRecipients($message, $to, [], []);
 
 		$results = $this->mapper->getAllForUser($this->account->getUserId());
 		$row = $results[0];

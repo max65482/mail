@@ -167,7 +167,7 @@ class OutboxServiceTest extends TestCase {
 			->method('deleteWithRelated')
 			->with($message);
 
-		$this->outboxService->deleteMessage($message);
+		$this->outboxService->deleteMessage($this->userId, $message);
 	}
 
 	public function testDeleteMessageWithException(): void {
@@ -185,7 +185,7 @@ class OutboxServiceTest extends TestCase {
 			->willThrowException(new Exception());
 
 		$this->expectException(ServiceException::class);
-		$this->outboxService->deleteMessage($message);
+		$this->outboxService->deleteMessage($this->userId, $message);
 	}
 
 	public function testSaveMessage(): void {

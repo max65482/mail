@@ -52,7 +52,7 @@ class OutboxController extends Controller {
 								$UserId,
 								IRequest $request,
 								OutboxService $service,
-	AccountService $accountService) {
+								AccountService $accountService) {
 		parent::__construct($appName, $request);
 		$this->userId = $UserId;
 		$this->service = $service;
@@ -77,15 +77,9 @@ class OutboxController extends Controller {
 	 * @return JsonResponse
 	 */
 	public function show(int $id): JsonResponse {
-		try {
-			$message = $this->service->getMessage($id, $this->userId);
-			$this->accountService->find($this->userId, $message->getAccountId());
-			return JsonResponse::success($message);
-		} catch (ClientException $e) {
-			return JsonResponse::fail($e->getMessage(), $e->getHttpCode());
-		} catch (DoesNotExistException $e) {
-			return JsonResponse::fail(null, Http::STATUS_NOT_FOUND);
-		}
+		$message = $this->service->getMessage($id, $this->userId);
+		$this->accountService->find($this->userId, $message->getAccountId());
+		return JsonResponse::success($message);
 	}
 
 	/**
@@ -116,11 +110,7 @@ class OutboxController extends Controller {
 		?int $aliasId = null,
 		?string $inReplyToMessageId = null
 	): JsonResponse {
-		try {
-			$this->accountService->find($this->userId, $accountId);
-		} catch (ClientException $e) {
-			return JsonResponse::fail(null, Http::STATUS_FORBIDDEN);
-		}
+		$this->accountService->find($this->userId, $accountId);
 
 		$message = new LocalMessage();
 		$message->setType(LocalMessage::TYPE_OUTGOING);
@@ -164,12 +154,8 @@ class OutboxController extends Controller {
 						   array $attachmentIds = [],
 						   ?int $aliasId = null,
 						   ?string $inReplyToMessageId = null): JsonResponse {
-		try {
-			$message = $this->service->getMessage($id, $this->userId);
-			$this->accountService->find($this->userId, $message->getAccountId());
-		} catch (DoesNotExistException $e) {
-			return JsonResponse::fail('', Http::STATUS_NOT_FOUND);
-		}
+		$message = $this->service->getMessage($id, $this->userId);
+		$this->accountService->find($this->userId, $message->getAccountId());
 
 		$message->setAccountId($accountId);
 		$message->setSubject($subject);
@@ -191,12 +177,13 @@ class OutboxController extends Controller {
 	 * @return JsonResponse
 	 */
 	public function send(int $id): JsonResponse {
+		$message = $this->service->getMessage($id, $this->userId);
+		$account = $this->accountService->find($this->userId, $message->getAccountId());
+
 		try {
-			$message = $this->service->getMessage($id, $this->userId);
-			$account = $this->accountService->find($this->userId, $message->getAccountId());
 			$this->service->sendMessage($message, $account);
-		} catch (DoesNotExistException $e) {
-			return JsonResponse::fail($e->getMessage(), Http::STATUS_NOT_FOUND);
+		} catch (ClientException $e) {
+			return JsonResponse::fail($e->getMessage(), $e->getHttpCode());
 		}
 		return  JsonResponse::success(
 			'Message sent', Http::STATUS_ACCEPTED
@@ -211,13 +198,9 @@ class OutboxController extends Controller {
 	 * @return JsonResponse
 	 */
 	public function destroy(int $id): JsonResponse {
-		try {
-			$message = $this->service->getMessage($id, $this->userId);
-			$this->accountService->find($this->userId, $message->getAccountId());
-			$this->service->deleteMessage($message);
-		} catch (ServiceException | ClientException $e) {
-			return JsonResponse::fail($e->getMessage());
-		}
+		$message = $this->service->getMessage($id, $this->userId);
+		$this->accountService->find($this->userId, $message->getAccountId());
+		$this->service->deleteMessage($this->userId, $message);
 		return JsonResponse::success('Message deleted', Http::STATUS_ACCEPTED);
 	}
 }
