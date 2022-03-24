@@ -71,9 +71,6 @@ class MessageMapperTest extends TestCase {
 		$fetchResults[1] = $fetchResult2;
 		$fetchResult1->method('getUid')
 			->willReturn(1);
-		$toRecipients = array_map(function ($recipient) {
-			return Recipient::fromRow($recipient);
-		}, $to);
 		$fetchResult2->method('getUid')
 			->willReturn(3);
 		$message1 = new IMAPMessage($imapClient, $mailbox, 1, $fetchResult1);
