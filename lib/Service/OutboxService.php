@@ -95,7 +95,7 @@ class OutboxService implements ILocalMailboxService {
 		$toRecipients = self::convertToRecipient($to, Recipient::TYPE_TO);
 		$ccRecipients = self::convertToRecipient($cc, Recipient::TYPE_CC);
 		$bccRecipients = self::convertToRecipient($bcc, Recipient::TYPE_BCC);
-		$message = $this->mapper->saveWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
+		$message = $this->mapper->saveWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients);
 		$message->setAttachments($this->attachmentService->saveLocalMessageAttachments($message->getId(), $attachmentIds));
 		return $message;
 	}

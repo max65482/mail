@@ -121,7 +121,7 @@ class LocalMessageMapper extends QBMapper {
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
 	 */
-	public function saveWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+	public function saveWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc): LocalMessage {
 		$this->db->beginTransaction();
 		try {
 			$message = $this->insert($message);
