@@ -143,20 +143,19 @@ class LocalMessageMapper extends QBMapper {
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
 	 */
-	public function updateWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
-		// make diff here:
-		// compoare ald vs new like tags
-		$attachments = $message->getAttachments();
-
+	public function updateWithRecipients(LocalMessage $message, array $to, array $cc, array $bcc): LocalMessage {
 		$this->db->beginTransaction();
 		try {
 			$message = $this->update($message);
+
 			$this->recipientMapper->updateRecipients($message->getId(), $message->getRecipients(), $to, $cc, $bcc);
 			$this->db->commit();
 		} catch (Throwable $e) {
 			$this->db->rollBack();
 			throw $e;
 		}
+		$recipients = $this->recipientMapper->findByLocalMessageId($message->getId());
+		$message->setRecipients($recipients);
 		return $message;
 	}
 

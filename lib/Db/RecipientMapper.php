@@ -129,14 +129,14 @@ class RecipientMapper extends QBMapper {
 		$newTo = array_udiff($to, $oldTo, static function (Recipient $a, Recipient $b) {
 			return strcmp($a->getEmail(), $b->getEmail());
 		});
-		if(!empty($newTo)) {
+		if (!empty($newTo)) {
 			$this->saveRecipients($localMessageId, $newTo);
 		}
 
 		$toRemove = array_udiff($oldTo, $to, static function (Recipient $a, Recipient $b) {
 			return strcmp($a->getEmail(), $b->getEmail());
 		});
-		foreach($toRemove as $r) {
+		foreach ($toRemove as $r) {
 			$this->delete($r);
 		}
 
@@ -144,14 +144,14 @@ class RecipientMapper extends QBMapper {
 		$newCC = array_udiff($cc, $oldCc, static function (Recipient $a, Recipient $b) {
 			return strcmp($a->getEmail(), $b->getEmail());
 		});
-		if(!empty($newCC)) {
+		if (!empty($newCC)) {
 			$this->saveRecipients($localMessageId, $newCC);
 		}
 
 		$ccRemove = array_udiff($oldCc, $cc, static function (Recipient $a, Recipient $b) {
 			return strcmp($a->getEmail(), $b->getEmail());
 		});
-		foreach($ccRemove as $r) {
+		foreach ($ccRemove as $r) {
 			$this->delete($r);
 		}
 
@@ -166,9 +166,8 @@ class RecipientMapper extends QBMapper {
 		$bccRemove = array_udiff($oldBcc, $bcc, static function (Recipient $a, Recipient $b) {
 			return strcmp($a->getEmail(), $b->getEmail());
 		});
-		foreach($bccRemove as $r) {
+		foreach ($bccRemove as $r) {
 			$this->delete($r);
 		}
 	}
-
 }

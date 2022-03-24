@@ -213,28 +213,28 @@ class MailTransmission implements IMailTransmission {
 		$to = new AddressList(
 				array_map(static function ($recipient) {
 					return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
-				}, array_filter($message->getRecipients(), static function(Recipient $recipient){
+				}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
 					return $recipient->getType() === Recipient::TYPE_TO;
 				})
 			)
 		);
-		$cc =  new AddressList(
+		$cc = new AddressList(
 			array_map(static function ($recipient) {
 				return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
-			}, array_filter($message->getRecipients(), static function(Recipient $recipient){
-					return $recipient->getType() === Recipient::TYPE_CC;
-				})
+			}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
+				return $recipient->getType() === Recipient::TYPE_CC;
+			})
 			)
 		);
-		$bcc =  new AddressList(
+		$bcc = new AddressList(
 			array_map(static function ($recipient) {
 				return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
-			}, array_filter($message->getRecipients(), static function(Recipient $recipient){
-					return $recipient->getType() === Recipient::TYPE_BCC;
-				})
+			}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
+				return $recipient->getType() === Recipient::TYPE_BCC;
+			})
 			)
 		);
-// @todo build replied to message here
+		// @todo build replied to message here
 //		if($message->getInReplyToMessageId() !== null) {
 //			$replyMessage = $this->mailManager->getMessage($account->getUserId(), $id);
 //		}

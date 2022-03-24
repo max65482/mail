@@ -206,6 +206,5 @@ class RecipientMapperTest extends TestCase {
 
 		$results = $this->mapper->findByLocalMessageId($message->getId());
 		$this->assertCount(2, $results);
-
 	}
 }

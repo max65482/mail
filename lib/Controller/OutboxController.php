@@ -28,12 +28,10 @@ namespace OCA\Mail\Controller;
 
 use OCA\Mail\Db\LocalMessage;
 use OCA\Mail\Exception\ClientException;
-use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Http\JsonResponse;
 use OCA\Mail\Service\AccountService;
 use OCA\Mail\Service\OutboxService;
 use OCP\AppFramework\Controller;
-use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
 
@@ -121,7 +119,7 @@ class OutboxController extends Controller {
 		$message->setHtml($isHtml);
 		$message->setInReplyToMessageId($inReplyToMessageId);
 
-		$this->service->saveMessage($message, $to, $cc, $bcc, $attachmentIds);
+		$this->service->saveMessage($this->userId, $message, $to, $cc, $bcc, $attachmentIds);
 
 		return JsonResponse::success($message, Http::STATUS_CREATED);
 	}
@@ -164,7 +162,7 @@ class OutboxController extends Controller {
 		$message->setAliasId($aliasId);
 		$message->setInReplyToMessageId($inReplyToMessageId);
 
-		$message = $this->service->updateMessage($message, $to, $cc, $bcc, $attachmentIds);
+		$message = $this->service->updateMessage($this->userId, $message, $to, $cc, $bcc, $attachmentIds);
 
 		return JsonResponse::success($message, Http::STATUS_ACCEPTED);
 	}

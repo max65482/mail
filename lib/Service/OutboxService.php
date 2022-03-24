@@ -29,16 +29,11 @@ namespace OCA\Mail\Service;
 use OCA\Mail\Account;
 use OCA\Mail\Contracts\ILocalMailboxService;
 use OCA\Mail\Contracts\IMailTransmission;
-use OCA\Mail\Db\LocalAttachmentMapper;
 use OCA\Mail\Db\LocalMessage;
 use OCA\Mail\Db\LocalMessageMapper;
 use OCA\Mail\Db\Recipient;
-use OCA\Mail\Db\RecipientMapper;
-use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Service\Attachment\AttachmentService;
 use OCP\AppFramework\Db\DoesNotExistException;
-use OCP\DB\Exception;
-use Psr\Log\LoggerInterface;
 
 class OutboxService implements ILocalMailboxService {
 
@@ -96,26 +91,21 @@ class OutboxService implements ILocalMailboxService {
 		$this->mapper->deleteWithRecipients($message);
 	}
 
-	public function saveMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+	public function saveMessage(string $userId, LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
 		$toRecipients = self::convertToRecipient($to, Recipient::TYPE_TO);
 		$ccRecipients = self::convertToRecipient($cc, Recipient::TYPE_CC);
 		$bccRecipients = self::convertToRecipient($bcc, Recipient::TYPE_BCC);
-		// let the attachmentService handle the saving of attachments
-		$this->attachmentService->saveLocalMessageAttachments($message->getId(), $attachmentIds);
 		$message = $this->mapper->saveWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
-
+		$message->setAttachments($this->attachmentService->saveLocalMessageAttachments($message->getId(), $attachmentIds));
+		return $message;
 	}
 
-	public function updateMessage(LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
+	public function updateMessage(string $userId, LocalMessage $message, array $to, array $cc, array $bcc, array $attachmentIds = []): LocalMessage {
 		$toRecipients = self::convertToRecipient($to, Recipient::TYPE_TO);
 		$ccRecipients = self::convertToRecipient($cc, Recipient::TYPE_CC);
 		$bccRecipients = self::convertToRecipient($bcc, Recipient::TYPE_BCC);
-		// update message
-		// update recipients
-		// generate diff for attachments
-		// atttachmentService handles diff
-		$message = $this->attachmentService->updateLocalMessageAttachments($message, $attachmentIds);
-		$message = $this->mapper->updateWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients, $attachmentIds);
-
+		$message = $this->mapper->updateWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients);
+		$message->setAttachments($this->attachmentService->updateLocalMessageAttachments($userId, $message, $attachmentIds));
+		return $message;
 	}
 }

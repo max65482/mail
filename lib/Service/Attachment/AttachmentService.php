@@ -28,7 +28,6 @@ use OCA\Mail\Contracts\IAttachmentService;
 use OCA\Mail\Db\LocalAttachment;
 use OCA\Mail\Db\LocalAttachmentMapper;
 use OCA\Mail\Db\LocalMessage;
-use OCA\Mail\Db\Recipient;
 use OCA\Mail\Exception\AttachmentNotFoundException;
 use OCA\Mail\Exception\UploadException;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -105,10 +104,6 @@ class AttachmentService implements IAttachmentService {
 		$this->storage->delete($userId, $id);
 	}
 
-	public function saveLocalMessageAttachments(int $messageId, array $attachmentIds): void{
-		$this->mapper->saveLocalMessageAttachments($messageId, $attachmentIds);
-	}
-
 	public function deleteLocalMessageAttachments(string $userId, int $localMessageId): void {
 		$attachments = $this->mapper->findByLocalMessageId($localMessageId);
 		// delete entries
@@ -120,19 +115,31 @@ class AttachmentService implements IAttachmentService {
 		}
 	}
 
-	public function updateLocalMessageAttachments(string $userId, LocalMessage $message, $newAttachmentIds): LocalMessage {
+	/**
+	 * @return LocalAttachment[]
+	 */
+	public function saveLocalMessageAttachments(int $messageId, array $attachmentIds): array {
+		if (empty($attachmentIds)) {
+			return [];
+		}
+		$this->mapper->saveLocalMessageAttachments($messageId, $attachmentIds);
+		return $this->mapper->findByLocalMessageId($messageId);
+	}
+
+	/**
+	 * @return LocalAttachment[]
+	 */
+	public function updateLocalMessageAttachments(string $userId, LocalMessage $message, array $newAttachmentIds): array {
 		// no attachments any more. Delete any old ones and we're done
-		if(empty($newAttachmentIds)) {
+		if (empty($newAttachmentIds)) {
 			$this->deleteLocalMessageAttachments($userId, $message->getId());
-			$message->setAttachments([]);
-			return $message;
+			return [];
 		}
 
 		// no need to diff, no old attachments
-		if(empty($message->getAttachments())) {
+		if (empty($message->getAttachments())) {
 			$this->saveLocalMessageAttachments($message->getId(), $newAttachmentIds);
-			$message->setAttachments($this->mapper->findByLocalMessageId($message->getId()));
-			return $message;
+			return $this->mapper->findByLocalMessageId($message->getId());
 		}
 
 		$oldAttachmentIds = array_map(static function ($attachment) {
@@ -140,16 +147,15 @@ class AttachmentService implements IAttachmentService {
 		}, $message->getAttachments());
 
 		$add = array_diff($newAttachmentIds, $oldAttachmentIds);
-		if(!empty($add)) {
+		if (!empty($add)) {
 			$this->saveLocalMessageAttachments($message->getId(), $add);
 		}
 
 		$delete = array_diff($oldAttachmentIds, $newAttachmentIds);
-		if(!empty($delete)) {
+		if (!empty($delete)) {
 			$this->deleteLocalMessageAttachments($userId, $message->getId());
 		}
 
-		$message->setAttachments($this->mapper->findByLocalMessageId($message->getId()));
-		return $message;
+		return $this->mapper->findByLocalMessageId($message->getId());
 	}
 }
