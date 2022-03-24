@@ -62,7 +62,7 @@ class OutboxService implements ILocalMailboxService {
 	private static function convertToRecipient(array $recipients, int $type): array {
 		return array_map(function ($recipient) use ($type) {
 			$recipient['type'] = $type;
-			return Recipient::fromRow($recipient);
+			return Recipient::fromParams($recipient);
 		}, $recipients);
 	}
 

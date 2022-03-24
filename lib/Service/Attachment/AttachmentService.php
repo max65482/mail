@@ -138,7 +138,7 @@ class AttachmentService implements IAttachmentService {
 
 		// no need to diff, no old attachments
 		if (empty($message->getAttachments())) {
-			$this->saveLocalMessageAttachments($message->getId(), $newAttachmentIds);
+			$this->mapper->saveLocalMessageAttachments($message->getId(), $newAttachmentIds);
 			return $this->mapper->findByLocalMessageId($message->getId());
 		}
 
@@ -148,7 +148,7 @@ class AttachmentService implements IAttachmentService {
 
 		$add = array_diff($newAttachmentIds, $oldAttachmentIds);
 		if (!empty($add)) {
-			$this->saveLocalMessageAttachments($message->getId(), $add);
+			$this->mapper->saveLocalMessageAttachments($message->getId(), $add);
 		}
 
 		$delete = array_diff($oldAttachmentIds, $newAttachmentIds);

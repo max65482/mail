@@ -153,7 +153,6 @@ class OutboxController extends Controller {
 						   ?int $aliasId = null,
 						   ?string $inReplyToMessageId = null): JsonResponse {
 		$message = $this->service->getMessage($id, $this->userId);
-		$this->accountService->find($this->userId, $message->getAccountId());
 
 		$message->setAccountId($accountId);
 		$message->setSubject($subject);
@@ -197,7 +196,6 @@ class OutboxController extends Controller {
 	 */
 	public function destroy(int $id): JsonResponse {
 		$message = $this->service->getMessage($id, $this->userId);
-		$this->accountService->find($this->userId, $message->getAccountId());
 		$this->service->deleteMessage($this->userId, $message);
 		return JsonResponse::success('Message deleted', Http::STATUS_ACCEPTED);
 	}

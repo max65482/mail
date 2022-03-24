@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Luc Calaresu <dev@calaresu.com>
+ * @author Anna Larch <anna.larch@gmx.net>
  *
  * Mail
  *
@@ -56,6 +57,7 @@ class LocalAttachmentMapper extends QBMapper {
 	}
 
 	/**
+	 * @todo - user ID?
 	 * @return LocalAttachment[]
 	 */
 	public function findByLocalMessageIds(array $localMessageIds): array {
@@ -96,12 +98,12 @@ class LocalAttachmentMapper extends QBMapper {
 		}
 	}
 
-	public function saveLocalMessageAttachments(int $messageId, array $attachmentIds) {
+	public function saveLocalMessageAttachments(int $localMessageId, array $attachmentIds) {
 		$this->db->beginTransaction();
 		try {
 			$qb = $this->db->getQueryBuilder();
 			$qb->update($this->getTableName())
-				->set('local_message_id', $qb->createNamedParameter($messageId, IQueryBuilder::PARAM_INT))
+				->set('local_message_id', $qb->createNamedParameter($localMessageId, IQueryBuilder::PARAM_INT))
 				->where(
 					$qb->expr()->in('id', $qb->createNamedParameter($attachmentIds, IQueryBuilder::PARAM_INT_ARRAY), IQueryBuilder::PARAM_INT_ARRAY)
 				);

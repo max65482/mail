@@ -129,14 +129,14 @@ class LocalMessageMapperTest extends TestCase {
 	 * @depends testFindById
 	 */
 	public function testDeleteWithRelated(): void {
-		$this->mapper->deleteWithRelated($this->entity);
+		$this->mapper->deleteWithRecipients($this->entity);
 
 		$result = $this->mapper->getAllForUser($this->getTestAccountUserId());
 
 		$this->assertEmpty($result);
 	}
 
-	public function testSaveWithRelatedData(): void {
+	public function testSaveWithRecipient(): void {
 		// cleanup
 		$qb = $this->db->getQueryBuilder();
 		$delete = $qb->delete($this->mapper->getTableName());
@@ -154,6 +154,7 @@ class LocalMessageMapperTest extends TestCase {
 		$recipient = new Recipient();
 		$recipient->setEmail('wizard@stardew-valley.com');
 		$recipient->setLabel('M. Rasmodeus');
+		$recipient->setType(Recipient::TYPE_TO);
 		$to = [$recipient];
 
 		$this->mapper->saveWithRecipients($message, $to, [], []);

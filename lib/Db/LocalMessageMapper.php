@@ -134,7 +134,8 @@ class LocalMessageMapper extends QBMapper {
 			$this->db->rollBack();
 			throw $e;
 		}
-
+		$recipients = $this->recipientMapper->findByLocalMessageId($message->getId());
+		$message->setRecipients($recipients);
 		return $message;
 	}
 
