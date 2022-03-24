@@ -29,20 +29,16 @@ namespace OCA\Mail\Tests\Unit\Service;
 use ChristophWurst\Nextcloud\Testing\TestCase;
 use OCA\Mail\Account;
 use OCA\Mail\Db\LocalAttachment;
-use OCA\Mail\Db\LocalAttachmentMapper;
 use OCA\Mail\Db\LocalMessage;
 use OCA\Mail\Db\LocalMessageMapper;
 use OCA\Mail\Db\Recipient;
-use OCA\Mail\Db\RecipientMapper;
 use OCA\Mail\Exception\ClientException;
-use OCA\Mail\Exception\ServiceException;
 use OCA\Mail\Service\Attachment\AttachmentService;
 use OCA\Mail\Service\MailTransmission;
 use OCA\Mail\Service\OutboxService;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\DB\Exception;
-use Psr\Log\LoggerInterface;
 
 class OutboxServiceTest extends TestCase {
 

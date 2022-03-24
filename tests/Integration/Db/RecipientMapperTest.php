@@ -52,9 +52,6 @@ class RecipientMapperTest extends TestCase {
 	/** @var Recipient */
 	private $inboxRecipient;
 
-	/** @var Recipient */
-	private $outboxRecipient;
-
 	/** @var LocalMessage  */
 	private $message;
 
@@ -97,12 +94,12 @@ class RecipientMapperTest extends TestCase {
 		$message->setInReplyToMessageId('abcd');
 		$this->message = $this->localMessageMapper->insert($message);
 
-		$this->outboxRecipient = new Recipient();
-		$this->outboxRecipient->setLocalMessageId($this->message->getId());
-		$this->outboxRecipient->setEmail('doc@stardew-clinic.com');
-		$this->outboxRecipient->setType(Recipient::TYPE_TO);
-		$this->outboxRecipient->setLabel('Dr. Harvey');
-		$this->mapper->insert($this->outboxRecipient);
+		$outboxRecipient = new Recipient();
+		$outboxRecipient->setLocalMessageId($this->message->getId());
+		$outboxRecipient->setEmail('doc@stardew-clinic.com');
+		$outboxRecipient->setType(Recipient::TYPE_TO);
+		$outboxRecipient->setLabel('Dr. Harvey');
+		$this->mapper->insert($outboxRecipient);
 
 		$inboxRecipientTwo = new Recipient();
 		$inboxRecipientTwo->setLocalMessageId($this->message->getId());
@@ -160,7 +157,8 @@ class RecipientMapperTest extends TestCase {
 		$recipient = new Recipient();
 		$recipient->setEmail('penny@stardewvalleylibrary.edu');
 		$recipient->setLabel('Penny');
-		$this->mapper->saveRecipients($message->getId(), [$recipient], Recipient::TYPE_FROM);
+		$recipient->setType(Recipient::TYPE_FROM);
+		$this->mapper->saveRecipients($message->getId(), [$recipient]);
 
 		$results = $this->mapper->findByLocalMessageId($message->getId());
 		$this->assertCount(1, $results);
@@ -188,7 +186,7 @@ class RecipientMapperTest extends TestCase {
 		$penny = new Recipient();
 		$penny->setEmail('penny@stardewvalleylibrary.edu');
 		$penny->setLabel('Penny');
-		$penny->setType(Recipient::TYPE_BCC);
+		$penny->setType(Recipient::TYPE_TO);
 		$this->mapper->saveRecipients($message->getId(), [$penny], Recipient::TYPE_BCC);
 
 		$results = $this->mapper->findByLocalMessageId($message->getId());
@@ -199,6 +197,7 @@ class RecipientMapperTest extends TestCase {
 		$pierre = new Recipient();
 		$pierre->setLabel('Pierre');
 		$pierre->setEmail('generalstore@stardewvalley.com');
+		$pierre->setType(Recipient::TYPE_TO);
 		$to = [$penny, $pierre];
 		$cc = [];
 		$bcc = [];
