@@ -39,6 +39,7 @@ use OCA\Mail\IMAP\MessageMapper;
 use OCA\Mail\Model\NewMessageData;
 use OCA\Mail\Model\RepliedMessageData;
 use OCA\Mail\Service\AccountService;
+use OCA\Mail\Service\AliasesService;
 use OCA\Mail\Service\Attachment\UploadedFile;
 use OCA\Mail\Service\MailTransmission;
 use OCA\Mail\SMTP\SmtpClientFactory;
@@ -114,7 +115,8 @@ class MailTransmissionIntegrationTest extends TestCase {
 			OC::$server->query(MailboxMapper::class),
 			OC::$server->query(MessageMapper::class),
 			OC::$server->query(LoggerInterface::class),
-			OC::$server->query(PerformanceLogger::class)
+			OC::$server->query(PerformanceLogger::class),
+			OC::$server->get(AliasesService::class)
 		);
 	}
 

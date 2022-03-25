@@ -708,4 +708,15 @@ class MailManager implements IMailManager {
 			);
 		}
 	}
+
+	/**
+	 * @param Account $account
+	 * @param string $messageId
+	 *
+	 * @return array
+	 */
+	public function getByMessageId(Account $account, string $messageId): array {
+		// @todo what happends if there is more than one or no message (because it has been deleted etc?)
+		return $this->dbMessageMapper->findByMessageId($account, $messageId);
+	}
 }

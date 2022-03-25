@@ -616,6 +616,25 @@ class MessageMapper extends QBMapper {
 	}
 
 	/**
+	 * @param Account $account
+	 * @param string $messageId
+	 *
+	 * @return Message[]
+	 */
+	public function findByMessageId(Account $account, string $messageId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('messages.*')
+			->from($this->getTableName(), 'messages')
+			->join('messages', 'mail_mailboxes', 'mailboxes', $qb->expr()->eq('messages.mailbox_id', 'mailboxes.id', IQueryBuilder::PARAM_INT))
+			->where(
+				$qb->expr()->eq('mailboxes.account_id', $qb->createNamedParameter($account->getId(), IQueryBuilder::PARAM_INT)),
+				$qb->expr()->eq('messages.message_id', $qb->createNamedParameter($messageId, IQueryBuilder::PARAM_STR), IQueryBuilder::PARAM_STR)
+			);
+
+		return $this->findEntities($qb);
+	}
+
+	/**
 	 * @param Mailbox $mailbox
 	 * @param SearchQuery $query
 	 * @param int|null $limit

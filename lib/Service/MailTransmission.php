@@ -106,6 +106,9 @@ class MailTransmission implements IMailTransmission {
 	/** @var PerformanceLogger */
 	private $performanceLogger;
 
+	/** @var AliasesService */
+	private $aliasesService;
+
 	/**
 	 * @param Folder $userFolder
 	 */
@@ -119,7 +122,8 @@ class MailTransmission implements IMailTransmission {
 								MailboxMapper $mailboxMapper,
 								MessageMapper $messageMapper,
 								LoggerInterface $logger,
-								PerformanceLogger $performanceLogger) {
+								PerformanceLogger $performanceLogger,
+								AliasesService $aliasesService) {
 		$this->accountService = $accountService;
 		$this->userFolder = $userFolder;
 		$this->attachmentService = $attachmentService;
@@ -131,6 +135,7 @@ class MailTransmission implements IMailTransmission {
 		$this->messageMapper = $messageMapper;
 		$this->logger = $logger;
 		$this->performanceLogger = $performanceLogger;
+		$this->aliasesService = $aliasesService;
 	}
 
 	public function sendMessage(NewMessageData $messageData,
@@ -212,7 +217,7 @@ class MailTransmission implements IMailTransmission {
 	public function sendLocalMessage(Account $account, LocalMessage $message): void {
 		$to = new AddressList(
 				array_map(static function ($recipient) {
-					return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
+					return Address::fromRaw($recipient->getLabel() ?? $recipient->getEmail(), $recipient->getEmail());
 				}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
 					return $recipient->getType() === Recipient::TYPE_TO;
 				})
@@ -220,7 +225,7 @@ class MailTransmission implements IMailTransmission {
 		);
 		$cc = new AddressList(
 			array_map(static function ($recipient) {
-				return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
+				return Address::fromRaw($recipient->getLabel() ?? $recipient->getEmail(), $recipient->getEmail());
 			}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
 				return $recipient->getType() === Recipient::TYPE_CC;
 			})
@@ -228,24 +233,35 @@ class MailTransmission implements IMailTransmission {
 		);
 		$bcc = new AddressList(
 			array_map(static function ($recipient) {
-				return Address::fromRaw($recipient->getLabel(), $recipient->getEmail());
+				return Address::fromRaw($recipient->getLabel() ?? $recipient->getEmail(), $recipient->getEmail());
 			}, array_filter($message->getRecipients(), static function (Recipient $recipient) {
 				return $recipient->getType() === Recipient::TYPE_BCC;
 			})
 			)
 		);
-		// @todo build replied to message here
-//		if($message->getInReplyToMessageId() !== null) {
-//			$replyMessage = $this->mailManager->getMessage($account->getUserId(), $id);
-//		}
-
 		$messageData = new NewMessageData($account, $to, $cc, $bcc, $message->getSubject(), $message->getBody(), $message->getAttachments(), $message->isHtml());
 
 		try {
-			$this->sendMessage($messageData);
+			$alias = $this->aliasesService->find($message->getAliasId(), $account->getUserId());
+		} catch (DoesNotExistException $e) {
+			// do something here?
+			// we can still send just not with an alias
+		}
+
+		if ($message->getInReplyToMessageId() !== null) {
+			$replyMessages = $this->mailManager->getByMessageId($account, $message->getInReplyToMessageId());
+			if (!empty($replyMessages)) {
+				$replyData = new RepliedMessageData($account, $replyMessages[0]); // this could be trouble?
+			}
+		}
+
+		try {
+			$this->sendMessage($messageData, $replyData ?? null, $alias ?? null);
 		} catch (SentMailboxNotSetException $e) {
 			throw new ClientException('Could not send message' . $e->getMessage(), $e->getCode(), $e);
 		}
+
+		// @todo mark message as replied to???? or does the send handle that?
 	}
 
 	/**

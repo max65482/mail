@@ -293,4 +293,11 @@ interface IMailManager {
 	 * @throws ServiceException
 	 */
 	public function deleteThread(Account $account, Mailbox $mailbox, string $threadRootId): void;
+
+	/**
+	 * @param Account $account
+	 * @param string $messageId
+	 * @return Message[]
+	 */
+	public function getByMessageId(Account $account, string $messageId): array;
 }
