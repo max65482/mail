@@ -34,6 +34,9 @@ use OCA\Mail\Db\LocalMessageMapper;
 use OCA\Mail\Db\Recipient;
 use OCA\Mail\Service\Attachment\AttachmentService;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Utility\ITimeFactory;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 class OutboxService implements ILocalMailboxService {
 
@@ -46,12 +49,27 @@ class OutboxService implements ILocalMailboxService {
 	/** @var AttachmentService */
 	private $attachmentService;
 
+	/** @var AccountService */
+	private $accountService;
+
+	/** @var ITimeFactory */
+	private $timeFactory;
+
+	/** @var LoggerInterface */
+	private $logger;
+
 	public function __construct(IMailTransmission $transmission,
 								LocalMessageMapper $mapper,
-								AttachmentService $attachmentService) {
+								AttachmentService $attachmentService,
+								AccountService $accountService,
+								ITimeFactory $timeFactory,
+								LoggerInterface $logger) {
 		$this->transmission = $transmission;
 		$this->mapper = $mapper;
 		$this->attachmentService = $attachmentService;
+		$this->timeFactory = $timeFactory;
+		$this->logger = $logger;
+		$this->accountService = $accountService;
 	}
 
 	/**
@@ -107,5 +125,28 @@ class OutboxService implements ILocalMailboxService {
 		$message = $this->mapper->updateWithRecipients($message, $toRecipients, $ccRecipients, $bccRecipients);
 		$message->setAttachments($this->attachmentService->updateLocalMessageAttachments($userId, $message, $attachmentIds));
 		return $message;
+	}
+
+	public function flush(): void {
+		$messages = $this->mapper->findDue(
+			$this->timeFactory->getTime()
+		);
+
+		foreach($messages as $message) {
+			try {
+				// TODO: memoize accounts
+				$this->sendMessage(
+					$message,
+					$this->accountService->findById($message->getAccountId()),
+				);
+			} catch (Throwable $e) {
+				// Failure of one message should not stop sending other messages
+				// Log and continue
+				$this->logger->warning('Could not send outbox message {id}: ' . $e->getMessage(), [
+					'id' => $message->getId(),
+					'exception' => $e,
+				]);
+			}
+		}
 	}
 }

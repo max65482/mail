@@ -117,6 +117,24 @@ class LocalMessageMapper extends QBMapper {
 	}
 
 	/**
+	 * Find all messages that should be sent
+	 *
+	 * @param int $time upper bound send time stamp
+	 *
+	 * @return LocalMessage[]
+	 */
+	public function findDue(int $time): array {
+		$qb = $this->db->getQueryBuilder();
+		$select = $qb->select($this->getTableName())
+			->where(
+				$qb->expr()->isNotNull('send_at'),
+				$qb->expr()->lte('send_at', $qb->createNamedParameter($time, IQueryBuilder::PARAM_INT), IQueryBuilder::PARAM_INT)
+			);
+		// TODO: related data
+		return $this->findEntities($select);
+	}
+
+	/**
 	 * @param Recipient[] $to
 	 * @param Recipient[] $cc
 	 * @param Recipient[] $bcc
