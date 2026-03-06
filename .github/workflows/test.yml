@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2019-2024 Nextcloud GmbH and Nextcloud contributors
 # SPDX-License-Identifier: MIT
 name: Test
-on: pull_request
+on: [pull_request, workflow_dispatch]
 
 permissions:
   contents: read
